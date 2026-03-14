@@ -1,0 +1,29 @@
+# Web framework
+fastapi>=0.135.1,<1.0.0
+uvicorn[standard]>=0.41.0,<1.0.0
+
+# Agent framework + LLM
+# CrewAI currently publishes official support for Python >=3.10,<3.14.
+# Installing this on Python 3.14 currently falls through to a pydantic-core build
+# that fails in the CrewAI dependency chain.
+crewai==1.10.1
+
+# xAI / OpenAI-compatible client
+openai>=2.28.0,<3.0.0
+
+# Environment management
+python-dotenv>=1.1.1,<2.0.0
+
+# ML / anomaly
+scikit-learn>=1.8.0
+numpy>=1.26.4
+pandas>=2.3.3
+
+# Google Cloud (OCR, HMIS sync)
+google-cloud-vision>=3.12.1
+
+# Database
+supabase>=2.28.2
+
+# Optional tool bundle for future agents:
+# crewai-tools==1.10.1
