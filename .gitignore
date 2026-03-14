@@ -17,3 +17,6 @@ venv/
 # Backend secrets and local model binaries
 nirvaah/nirvaah-backend/service-account.json
 nirvaah/nirvaah-backend/models/*.pkl
+
+# Ignore accidental duplicate workspace folder
+nirvaah_security/
