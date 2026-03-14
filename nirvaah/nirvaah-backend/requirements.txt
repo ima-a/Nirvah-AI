@@ -24,3 +24,5 @@ pandas
 numpy
 python-dotenv
 openai
+pytesseract
+Pillow
