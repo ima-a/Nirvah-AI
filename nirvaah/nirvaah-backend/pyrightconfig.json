@@ -1,0 +1,9 @@
+{
+  "executionEnvironments": [
+    {
+      "root": "."
+    }
+  ],
+  "venvPath": ".",
+  "include": ["app"]
+}
