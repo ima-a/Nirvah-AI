@@ -1,0 +1,15 @@
+[
+  "age_of_mother",
+  "parity",
+  "education_level",
+  "distance_to_phc_km",
+  "gestational_age_at_first_anc",
+  "hemoglobin",
+  "ifa_tablets_given_total",
+  "previous_institutional_delivery",
+  "previous_pnc_received",
+  "pmmvy_enrolled",
+  "jsy_enrolled",
+  "bpl_status",
+  "sc_st_status"
+]

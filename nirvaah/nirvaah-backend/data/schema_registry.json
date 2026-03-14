@@ -1,0 +1,90 @@
+{
+  "anc_visit": {
+    "hmis_fields": {
+      "ANC_BP_SYS": "bp_systolic",
+      "ANC_BP_DIA": "bp_diastolic",
+      "ANC_HB": "hemoglobin",
+      "ANC_WT": "weight_kg",
+      "ANC_IFA": "iron_tablets_given",
+      "ANC_GA": "gestational_age_weeks",
+      "ANC_VISIT_NUM": "anc_visit_number",
+      "ANC_TT": "tt_vaccination_status",
+      "ANC_URINE_ALB": "urine_albumin",
+      "ANC_NEXT_VISIT": "next_visit_date",
+      "ANC_NEXT_LOC": "next_visit_location",
+      "ANC_REFERRED": "referred",
+      "ANC_REFERRAL_LOC": "referral_location"
+    },
+    "mcts_fields": {
+      "visit_date": null,
+      "next_visit_date": "next_visit_date",
+      "next_visit_location": "next_visit_location",
+      "beneficiary_name": "beneficiary_name",
+      "beneficiary_age": "beneficiary_age",
+      "mcts_id": "mcts_id",
+      "weight_kg": "weight_kg",
+      "hemoglobin": "hemoglobin",
+      "referred": "referred"
+    },
+    "kerala_hims_fields": {
+      "hb_status": "derived:hemoglobin",
+      "anemia_grade": "derived:hemoglobin",
+      "bp_category": "derived:bp_systolic+bp_diastolic",
+      "next_visit_date": "next_visit_date",
+      "next_visit_location": "next_visit_location",
+      "ifa_given": "iron_tablets_given",
+      "bpl_card": "bpl_card"
+    }
+  },
+  "pnc_visit": {
+    "hmis_fields": {
+      "PNC_BP_SYS": "bp_systolic",
+      "PNC_BP_DIA": "bp_diastolic",
+      "PNC_HB": "hemoglobin",
+      "PNC_BABY_WT": "baby_weight_kg",
+      "PNC_REFERRED": "referred"
+    },
+    "mcts_fields": {
+      "visit_date": null,
+      "beneficiary_name": "beneficiary_name",
+      "mcts_id": "mcts_id",
+      "baby_weight_kg": "baby_weight_kg",
+      "referred": "referred"
+    },
+    "kerala_hims_fields": {
+      "hb_status": "derived:hemoglobin",
+      "baby_weight_category": "derived:baby_weight_kg",
+      "bp_category": "derived:bp_systolic+bp_diastolic"
+    }
+  },
+  "immunisation_visit": {
+    "hmis_fields": {
+      "IMM_VACCINES": "vaccines_given",
+      "IMM_BENEFICIARY": "beneficiary_name",
+      "IMM_AGE": "beneficiary_age"
+    },
+    "mcts_fields": {
+      "visit_date": null,
+      "beneficiary_name": "beneficiary_name",
+      "mcts_id": "mcts_id",
+      "vaccines_given": "vaccines_given"
+    },
+    "kerala_hims_fields": {
+      "vaccines_given": "vaccines_given",
+      "beneficiary_name": "beneficiary_name"
+    }
+  },
+  "family_planning_visit": {
+    "hmis_fields": {
+      "FP_BENEFICIARY": "beneficiary_name",
+      "FP_METHOD": "clinical_notes"
+    },
+    "mcts_fields": {
+      "beneficiary_name": "beneficiary_name",
+      "mcts_id": "mcts_id"
+    },
+    "kerala_hims_fields": {
+      "beneficiary_name": "beneficiary_name"
+    }
+  }
+}

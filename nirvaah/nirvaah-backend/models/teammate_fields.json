@@ -1,0 +1,64 @@
+{
+  "input_fields_order": [
+    "age_of_mother",
+    "parity",
+    "education_level",
+    "distance_to_phc_km",
+    "anc_visits_completed",
+    "gestational_age_at_first_anc",
+    "hemoglobin",
+    "ifa_tablets_given_total",
+    "previous_institutional_delivery",
+    "previous_pnc_received",
+    "pmmvy_enrolled",
+    "jsy_enrolled",
+    "bpl_status",
+    "sc_st_status"
+  ],
+  "trained_features": [
+    "age_of_mother",
+    "parity",
+    "education_level",
+    "distance_to_phc_km",
+    "gestational_age_at_first_anc",
+    "hemoglobin",
+    "ifa_tablets_given_total",
+    "previous_institutional_delivery",
+    "previous_pnc_received",
+    "pmmvy_enrolled",
+    "jsy_enrolled",
+    "bpl_status",
+    "sc_st_status"
+  ],
+  "excluded_from_training": {
+    "anc_visits_completed": "post-hoc score boost only -- would be leakage if trained on"
+  },
+  "encoding": {
+    "education_level": "0=No education, 1=Primary, 2=Secondary, 3=Higher",
+    "bpl_status": "0=Above BPL (wealth index 3-5), 1=BPL (wealth index 1-2)",
+    "sc_st_status": "0=General/OBC, 1=SC or ST",
+    "previous_institutional_delivery": "0=Home delivery or N/A (first birth), 1=Hospital/facility delivery",
+    "previous_pnc_received": "0=No PNC or N/A (first birth), 1=Received PNC",
+    "pmmvy_enrolled": "0=Not enrolled, 1=Enrolled in PMMVY",
+    "jsy_enrolled": "0=Not enrolled, 1=Received JSY benefit",
+    "distance_to_phc_km": "Float in km (suggested: 2.0=nearby, 4.0=moderate, 8.0=far)",
+    "hemoglobin": "Float g/dL (e.g. 10.2). Normal in pregnancy >= 11.0",
+    "ifa_tablets_given_total": "Integer. Full course = 180 tablets. Below 90 = incomplete",
+    "gestational_age_at_first_anc": "Weeks (integer). Early = <12wk, Late = >20wk",
+    "anc_visits_completed": "Integer 0-8. Post-hoc boost: 0\u2192+0.10, 1\u2192+0.05 added to score"
+  },
+  "thresholds": {
+    "routine": "score < 0.5",
+    "medium": "0.5 <= score < 0.7",
+    "high": "score >= 0.7  (supervisor WhatsApp alert triggered)"
+  },
+  "anomaly_model": {
+    "input_shape": [
+      1,
+      13
+    ],
+    "output": "binary flag: 0=normal, 1=anomalous",
+    "recommended_threshold": 0.6,
+    "note": "Same 13 features, same scaler"
+  }
+}

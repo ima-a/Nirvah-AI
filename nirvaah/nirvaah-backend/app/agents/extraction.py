@@ -10,6 +10,7 @@ load_dotenv()
 import json
 import os
 from groq import Groq
+from app.state import PipelineState
 
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
@@ -144,3 +145,123 @@ def extract_fields(transcript: str) -> dict:
 
 async def extract_fields_async(transcript: str) -> dict:
     return extract_fields(transcript)
+
+
+async def process_input(
+    audio_bytes: bytes = None,
+    text: str = None,
+    image_bytes: bytes = None
+) -> dict:
+    """
+    Routes incoming input to the appropriate processing path:
+      - voice (audio_bytes) → ElevenLabs STT → extract_fields
+      - text → extract_fields directly
+      - image (image_bytes) → OCR → extract_fields
+    
+    Returns the extraction result dict with added input_source and
+    ocr_text fields for pipeline state.
+    """
+    result = {}
+    
+    if audio_bytes:
+        # Voice path — transcribe with ElevenLabs then extract
+        try:
+            from app.transcription import transcribe_audio
+            transcript = await transcribe_audio(audio_bytes)
+        except Exception as e:
+            print(f"[EXTRACTION] Transcription failed: {e}")
+            transcript = ""
+        result = extract_fields(transcript) if transcript else {"overall_confidence": 0.0, "error": "transcription_failed"}
+        result["input_source"] = "voice"
+        result["ocr_text"] = ""
+    
+    elif image_bytes:
+        # Image path — OCR then extract
+        try:
+            from app.ocr import extract_text_from_image
+            ocr_text = await extract_text_from_image(image_bytes)
+        except Exception as e:
+            print(f"[EXTRACTION] OCR failed: {e}")
+            ocr_text = ""
+        result = extract_fields(ocr_text) if ocr_text else {"overall_confidence": 0.0, "error": "ocr_failed"}
+        result["input_source"] = "image"
+        result["ocr_text"] = ocr_text or ""
+    
+    elif text:
+        # Text path — extract directly
+        result = extract_fields(text)
+        result["input_source"] = "text"
+        result["ocr_text"] = ""
+    
+    else:
+        result = {"overall_confidence": 0.0, "error": "no_input"}
+        result["input_source"] = "unknown"
+        result["ocr_text"] = ""
+    
+    return result
+
+
+def extraction_node(state: PipelineState) -> dict:
+    """
+    LangGraph node wrapper for Agent 1.
+    
+    This function is the bridge between LangGraph's state-passing system 
+    and the existing extract_fields() function. LangGraph calls this with 
+    the full pipeline state. We read the transcript, run extraction, and 
+    return only the keys we changed — LangGraph merges our return dict 
+    back into the full state automatically.
+    """
+    import asyncio
+    
+    transcript = state.get("transcript", "")
+    
+    if not transcript:
+        # No transcript means nothing to extract. 
+        # Append to errors list rather than overwriting it.
+        return {
+            "extracted_fields": {},
+            "errors": state.get("errors", []) + ["extraction: empty transcript"],
+            "clarification_needed": True,
+            "clarification_question": "No message received. Please send your voice note or type your update."
+        }
+    
+    # Call the existing extract_fields() function.
+    # extract_fields_async is an async function, so we run it with asyncio.
+    # In a FastAPI context this works because we are running inside an 
+    # event loop — asyncio.run() would fail here, so we use a coroutine 
+    # approach instead.
+    try:
+        loop = asyncio.get_event_loop()
+        result = loop.run_until_complete(extract_fields_async(transcript))
+    except RuntimeError:
+        # If there is already a running event loop (FastAPI), use this instead
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            future = pool.submit(asyncio.run, extract_fields_async(transcript))
+            result = future.result()
+    
+    # Attach the input_source from state so downstream agents know 
+    # where this data came from
+    result["input_source"] = state.get("input_source", "unknown")
+    
+    # Check if confidence is too low to continue — if so, set the 
+    # clarification flag so the conditional edge in pipeline.py routes
+    # to the clarification node instead of the validation node
+    overall_confidence = result.get("overall_confidence", 0.0)
+    needs_clarification = overall_confidence < 0.70
+    
+    clarification_question = ""
+    if needs_clarification:
+        clarification_question = (
+            "Some details in your message were unclear. "
+            "Could you please repeat the key readings? "
+            "For example: BP 110/70, Hemoglobin 10.2, Weight 62kg."
+        )
+    
+    return {
+        "extracted_fields": result,
+        "clarification_needed": needs_clarification,
+        "clarification_question": clarification_question,
+        "errors": state.get("errors", [])  
+        # Pass errors through unchanged — we had no errors in this node
+    }
