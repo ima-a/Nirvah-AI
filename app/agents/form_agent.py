@@ -19,7 +19,7 @@ from app.state import PipelineState
 groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
 # Load schema registry once at module startup
-REGISTRY_PATH = Path(__file__).parent.parent / "data" / "schema_registry.json"
+REGISTRY_PATH = "data" / "schema_registry.json"
 
 
 def load_registry() -> dict:
