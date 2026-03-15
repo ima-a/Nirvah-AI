@@ -14,6 +14,7 @@ load_dotenv()
 import os
 import json
 import uuid
+import threading
 from datetime import datetime, timezone
 from celery import Celery
 from supabase import create_client, Client
@@ -256,20 +257,30 @@ def sync_record(
     input_source: str = "unknown"
 ) -> dict:
     """
-    Runs the database writes synchronously.
+    Spawns a background thread for the database writes.
+    This restores the fast-response feature without needing Celery,
+    preventing Twilio webhook timeouts.
     """
     record_id = str(uuid.uuid4())
 
-    # Run the write directly
-    results = sync_record_task(
-        mapped_forms=mapped_forms,
-        validated_fields=validated_fields,
-        sender_phone=sender_phone,
-        input_source=input_source,
-        record_id=record_id
+    # Run the write in a background thread
+    thread = threading.Thread(
+        target=sync_record_task,
+        kwargs={
+            "mapped_forms": mapped_forms,
+            "validated_fields": validated_fields,
+            "sender_phone": sender_phone,
+            "input_source": input_source,
+            "record_id": record_id
+        }
     )
+    thread.start()
 
-    return results
+    return {
+        "supabase": "queued",
+        "google_sheets": "queued",
+        "record_id": record_id
+    }
 
 
 # ----------------------------------------------------------------

@@ -19,7 +19,9 @@ from app.state import PipelineState
 groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
 # Load schema registry once at module startup
-REGISTRY_PATH = "data/schema_registry.json"
+# BASE_DIR is the project root (3 levels up from this file: app/agents/form_agent.py -> agents -> app -> root)
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+REGISTRY_PATH = BASE_DIR / "data" / "schema_registry.json"
 
 
 def load_registry() -> dict:
