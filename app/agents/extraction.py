@@ -204,20 +204,12 @@ async def process_input(
 def extraction_node(state: PipelineState) -> dict:
     """
     LangGraph node wrapper for Agent 1.
-    
-    This function is the bridge between LangGraph's state-passing system 
-    and the existing extract_fields() function. LangGraph calls this with 
-    the full pipeline state. We read the transcript, run extraction, and 
-    return only the keys we changed — LangGraph merges our return dict 
-    back into the full state automatically.
     """
     import asyncio
     
     transcript = state.get("transcript", "")
     
     if not transcript:
-        # No transcript means nothing to extract. 
-        # Append to errors list rather than overwriting it.
         return {
             "extracted_fields": {},
             "errors": state.get("errors", []) + ["extraction: empty transcript"],
@@ -225,20 +217,18 @@ def extraction_node(state: PipelineState) -> dict:
             "clarification_question": "No message received. Please send your voice note or type your update."
         }
     
-    # Call the existing extract_fields() function.
-    # extract_fields_async is an async function, so we run it with asyncio.
-    # In a FastAPI context this works because we are running inside an 
-    # event loop — asyncio.run() would fail here, so we use a coroutine 
-    # approach instead.
-    try:
-        loop = asyncio.get_event_loop()
-        result = loop.run_until_complete(extract_fields_async(transcript))
-    except RuntimeError:
-        # If there is already a running event loop (FastAPI), use this instead
-        import concurrent.futures
-        with concurrent.futures.ThreadPoolExecutor() as pool:
-            future = pool.submit(asyncio.run, extract_fields_async(transcript))
-            result = future.result()
+    # Use pre-populated extracted fields if available (from process_input in webhook.py)
+    # This prevents running Groq twice and avoids asyncio/threadpool crashes.
+    result = state.get("extracted_fields")
+    if not result or result.get("overall_confidence", 0.0) == 0.0 and "error" in result:
+        try:
+            loop = asyncio.get_event_loop()
+            result = loop.run_until_complete(extract_fields_async(transcript))
+        except RuntimeError:
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                future = pool.submit(asyncio.run, extract_fields_async(transcript))
+                result = future.result()
     
     # Attach the input_source from state so downstream agents know 
     # where this data came from
