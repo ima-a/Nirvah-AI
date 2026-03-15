@@ -23,6 +23,31 @@ async def twilio_webhook(
     webhook_log = process_webhook_entry(Body, sender_phone)
     clean_body = webhook_log['body_text']
 
+    # --- Survey Mode Routing (Intercepts before normal pipeline) ---
+    from app.survey_handler import is_in_survey_session, handle_survey_message
+    
+    # Check if worker is already in a survey session
+    if is_in_survey_session(sender_phone):
+        audio_bytes = None
+        if int(NumMedia) > 0 and MediaUrl0 and 'audio' in (MediaContentType0 or ''):
+            audio_bytes = await download_twilio_media(MediaUrl0)
+            
+        await handle_survey_message(sender_phone, text=clean_body, audio_bytes=audio_bytes)
+        return '<Response></Response>'
+
+    # Check if worker is starting a new survey session
+    if clean_body.strip().upper() == 'SURVEY':
+        await handle_survey_message(sender_phone, text=clean_body)
+        return '<Response></Response>'
+
+    # --- SOS Emergency Check ---
+    # Uses original Body (not clean_body) so PII stripping doesn't corrupt keyword.
+    # Silent response — no confirmation sent back to protect the worker.
+    from app.sos import is_sos_trigger, handle_sos
+    if is_sos_trigger(Body):
+        await handle_sos(sender_phone)
+        return '<Response></Response>'
+
     # Handle STOP / RECORD consent commands before routing to pipeline
     if Body.strip().upper() in ('STOP', 'RECORD'):
         consent_action = handle_consent_logic(Body)
