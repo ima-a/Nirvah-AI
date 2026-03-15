@@ -11,21 +11,21 @@ def send_whatsapp(to_phone: str, message: str):
     """Sends a WhatsApp message back to an ASHA worker."""
     client = get_twilio_client()
     
-    # Ensure from_ number is cleanly formatted
-    sandbox_number = os.environ.get('TWILIO_SANDBOX_NUMBER', '')
-    if not sandbox_number.startswith('whatsapp:'):
-        sandbox_number = f"whatsapp:{sandbox_number}"
+    # Bulletproof the 'From' number against typos in Render env vars (e.g. double pluses or no whatsapp: prefix)
+    raw_from = os.environ.get('TWILIO_SANDBOX_NUMBER', '')
+    clean_from = raw_from.replace('whatsapp:', '').replace('+', '').strip()
+    from_formatted = f"whatsapp:+{clean_from}"
         
-    # Ensure to_ phone is cleanly formatted (remove any existing prefixes or pluses, then add exactly one +)
+    # Bulletproof the 'To' number
     clean_to = to_phone.replace('whatsapp:', '').replace('+', '').strip()
     to_formatted = f"whatsapp:+{clean_to}"
     
     client.messages.create(
-        from_=sandbox_number,
+        from_=from_formatted,
         to=to_formatted,
         body=message
     )
-    print(f'[NOTIFY] Sent WhatsApp to {to_phone}')
+    print(f'[NOTIFY] Sent WhatsApp to {to_formatted}')
 
 def build_confirmation(record: dict) -> str:
     """Builds the confirmation message sent back to the ASHA worker."""
