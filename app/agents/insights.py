@@ -30,10 +30,19 @@ from data.scheme_eligibility import check_all_schemes
 
 groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
-supabase: Client = create_client(
-    os.environ.get("SUPABASE_URL"),
-    os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
-)
+# Lazy Supabase client — avoids crash if env vars not set at import time
+_supabase_client: Client | None = None
+
+
+def get_supabase() -> Client:
+    global _supabase_client
+    if _supabase_client is None:
+        url = os.environ.get("SUPABASE_URL", "")
+        key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+        if not url or not key:
+            raise RuntimeError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set")
+        _supabase_client = create_client(url, key)
+    return _supabase_client
 
 
 # ----------------------------------------------------------------
@@ -42,32 +51,44 @@ supabase: Client = create_client(
 # Model loading is slow. Inference is fast. Load once, reuse forever.
 # ----------------------------------------------------------------
 
-MODELS_DIR = Path(__file__).parent.parent / "models"
+MODELS_DIR = Path(__file__).parent.parent.parent / "models"
 
 
 def load_dropout_model():
     """
-    Load the XGBoost dropout prediction model and feature columns.
-    Returns (model, feature_columns) or (None, None) if not found.
+    Load the XGBoost dropout prediction model, scaler, threshold, and feature columns.
+    Returns (model, scaler, threshold, feature_columns) or (None, None, 0.54, None) if not found.
     """
     model_path = MODELS_DIR / "dropout_model.pkl"
-    features_path = MODELS_DIR / "dropout_feature_columns.json"
+    scaler_path = MODELS_DIR / "dropout_scaler.pkl"
+    features_path = MODELS_DIR / "feature_columns.json"
+    threshold_path = MODELS_DIR / "threshold.json"
 
     if not model_path.exists() or not features_path.exists():
         print("[INSIGHTS WARNING] Dropout model not found.")
         print("Run scripts/train_dropout_model.py first.")
-        return None, None
+        return None, None, 0.54, None
 
     model = joblib.load(model_path)
+
+    scaler = None
+    if scaler_path.exists():
+        scaler = joblib.load(scaler_path)
+
+    threshold = 0.54
+    if threshold_path.exists():
+        with open(threshold_path) as f:
+            threshold = json.load(f).get("threshold", 0.54)
+
     with open(features_path) as f:
         feature_columns = json.load(f)
 
-    print(f"[INSIGHTS OK] XGBoost dropout model loaded.")
-    return model, feature_columns
+    print(f"[INSIGHTS OK] XGBoost dropout model loaded (threshold={threshold}).")
+    return model, scaler, threshold, feature_columns
 
 
 # Module-level variables — loaded once, reused forever
-dropout_model, dropout_feature_columns = load_dropout_model()
+dropout_model, dropout_scaler, dropout_threshold, dropout_feature_columns = load_dropout_model()
 
 
 # ----------------------------------------------------------------
@@ -121,16 +142,20 @@ def build_dropout_features(validated_fields: dict) -> dict:
     bpl_card = 1.0 if validated_fields.get("bpl_card") else 0.0
 
     return {
-        "mother_age": mother_age,
-        "parity": parity,
-        "gestational_age_first_anc": gestational_age_first_anc,
-        "hemoglobin": hemoglobin,
-        "distance_to_phc_km": distance_to_phc_km,
-        "anc_visits_completed": anc_visits_completed,
-        "ifa_tablets_total": ifa_tablets_total,
-        "scheme_enrolled": scheme_enrolled,
-        "previous_institutional_delivery": previous_institutional_delivery,
-        "bpl_card": bpl_card
+        "age_of_mother": float(validated_fields.get("beneficiary_age") or 25.0),
+        "parity": float(max(0, min(3, (validated_fields.get("anc_visit_number") or 1) - 1))),
+        "education_level": float(validated_fields.get("education_level") or 2),
+        "distance_to_phc_km": float(validated_fields.get("distance_to_phc_km") or 3.0),
+        "gestational_age_at_first_anc": float(validated_fields.get("gestational_age_weeks") or 12.0),
+        "hemoglobin": float(validated_fields.get("hemoglobin") or 10.8),
+        "ifa_tablets_given_total": float(validated_fields.get("iron_tablets_given") or 30),
+        "previous_institutional_delivery": 1.0 if validated_fields.get("institutional_delivery") else 1.0,
+        "previous_pnc_received": 1.0 if validated_fields.get("pnc_received") else 0.0,
+        "pmmvy_enrolled": 1.0 if validated_fields.get("pmmvy_enrolled") else 0.0,
+        "jsy_enrolled": 1.0 if validated_fields.get("jsy_enrolled") else 0.0,
+        "bpl_status": 1.0 if validated_fields.get("bpl_card") else 0.0,
+        "sc_st_status": 1.0 if validated_fields.get("caste_category") in ("SC", "ST") else 0.0,
+        "state_code": 32.0,  # Kerala state code — model trained on NFHS-5
     }
 
 
@@ -150,11 +175,20 @@ def compute_dropout_risk(validated_fields: dict) -> float:
     try:
         features = build_dropout_features(validated_fields)
 
-        # Build numpy array in the correct column order
-        X = np.array([[features[col] for col in dropout_feature_columns]])
+        # Build array in the scaler's exact column order
+        try:
+            col_order = list(dropout_scaler.feature_names_in_)
+        except (AttributeError, TypeError):
+            col_order = list(features.keys())
+        row = [features.get(col, 0.0) for col in col_order]
+
+        # Scale features before prediction
+        if dropout_scaler is not None:
+            X = dropout_scaler.transform([row])
+        else:
+            X = np.array([row])
 
         # predict_proba returns [[prob_no_dropout, prob_dropout]]
-        # We want the second column — probability of dropout
         proba = dropout_model.predict_proba(X)[0][1]
         return float(proba)
 
@@ -240,7 +274,7 @@ def update_beneficiary_insights(
 
         # Update beneficiary record if name is available
         if beneficiary_name:
-            supabase.table("beneficiaries").update({
+            get_supabase().table("beneficiaries").update({
                 "dropout_risk": dropout_risk,
                 "eligible_schemes": eligible_schemes,  # stored as JSONB
                 "updated_at": datetime.now(timezone.utc).isoformat()
@@ -248,7 +282,7 @@ def update_beneficiary_insights(
 
         # Update the specific record with insights
         if record_id:
-            supabase.table("records").update({
+            get_supabase().table("records").update({
                 "dropout_risk": dropout_risk,
                 "eligible_schemes": eligible_schemes,
                 "updated_at": datetime.now(timezone.utc).isoformat()

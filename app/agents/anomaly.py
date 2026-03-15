@@ -46,7 +46,7 @@ def get_supabase() -> Client:
 # the model lives in memory and scoring takes under 5ms per submission.
 # ----------------------------------------------------------------
 
-MODELS_DIR = Path(__file__).parent.parent / "models"
+MODELS_DIR = Path(__file__).parent.parent.parent / "models"
 
 
 def load_models():
@@ -181,21 +181,36 @@ def extract_features(validated_fields: dict, sender_phone: str) -> dict:
 
 def score_with_ml(features: dict) -> float:
     """Score the feature vector using the Isolation Forest model."""
-    if anomaly_model is None:
+    if anomaly_model is None or anomaly_scaler is None:
         return 0.0  # skip ML scoring gracefully
 
-    X = np.array([[features[col] for col in feature_columns]])
-    X_scaled = anomaly_scaler.transform(X)
+    try:
+        n_expected = anomaly_scaler.n_features_in_
 
-    # decision_function: more negative = more anomalous
-    raw_score = anomaly_model.decision_function(X_scaled)[0]
+        # Try to use feature_names_in_ if available for exact column order
+        try:
+            col_order = list(anomaly_scaler.feature_names_in_)
+            row = [features.get(col, 0.0) for col in col_order]
+        except AttributeError:
+            # No feature names — build from known features, pad to expected size
+            known_cols = feature_columns or list(features.keys())
+            row = [features.get(col, 0.0) for col in known_cols]
+            while len(row) < n_expected:
+                row.append(0.0)
+            row = row[:n_expected]
 
-    # Convert to 0.0-1.0 where 1.0 = most anomalous
-    # -0.5 (very anomalous) → 1.0
-    #  0.0 (neutral)        → 0.5
-    # +0.5 (very normal)    → 0.0
-    normalized = 1.0 - (raw_score + 0.5) / 1.0
-    return float(max(0.0, min(1.0, normalized)))
+        X_scaled = anomaly_scaler.transform([row])
+
+        # decision_function: more negative = more anomalous
+        raw_score = anomaly_model.decision_function(X_scaled)[0]
+
+        # Convert to 0.0-1.0 where 1.0 = most anomalous
+        normalized = 1.0 - (raw_score + 0.5) / 1.0
+        return float(max(0.0, min(1.0, normalized)))
+
+    except Exception as e:
+        print(f"[ANOMALY] ML scoring failed: {e}")
+        return 0.0
 
 
 # ----------------------------------------------------------------

@@ -178,20 +178,15 @@ def handle_unmapped_fields(
     if visit_type not in SCHEMA_REGISTRY:
         visit_type = "anc_visit"
 
-    dest_key = {
-        "HMIS": "hmis_fields",
-        "MCTS": "mcts_fields",
-        "Kerala_HIMS": "kerala_hims_fields"
-    }.get(destination)
+    visit_schema = SCHEMA_REGISTRY.get(visit_type, {})
+    fields_array = visit_schema.get("fields", [])
 
-    if not dest_key:
-        return mapped
-
-    schema = SCHEMA_REGISTRY.get(visit_type, {}).get(dest_key, {})
-    all_source_values = set()
-    for v in schema.values():
-        if isinstance(v, str) and not v.startswith("derived:"):
-            all_source_values.add(v)
+    # Build set of all source field names used
+    all_source_fields = set()
+    for entry in fields_array:
+        fname = entry.get("field_name")
+        if fname:
+            all_source_fields.add(fname)
 
     # Fields to skip — metadata, not clinical data
     skip_fields = {
@@ -201,7 +196,7 @@ def handle_unmapped_fields(
 
     unmapped = {
         k: v for k, v in validated.items()
-        if k not in all_source_values
+        if k not in all_source_fields
         and v is not None
         and k not in skip_fields
     }
@@ -253,6 +248,35 @@ def handle_unmapped_fields(
 # MAIN MAPPING FUNCTION
 # ----------------------------------------------------------------
 
+def build_destination_mappings(fields_array: list) -> tuple[dict, dict, dict]:
+    """
+    Build HMIS, MCTS, and Kerala HIMS mapping dicts from the fields array.
+    Each entry in fields_array has: field_name, hmis_code, mcts_code, form_target.
+    Returns three dicts: {dest_code: source_field_name}
+    """
+    hmis = {}
+    mcts = {}
+    kerala = {}
+
+    for entry in fields_array:
+        field_name = entry.get("field_name")
+        if not field_name:
+            continue
+
+        targets = entry.get("form_target", [])
+        hmis_code = entry.get("hmis_code")
+        mcts_code = entry.get("mcts_code")
+
+        if "HMIS" in targets and hmis_code:
+            hmis[hmis_code] = field_name
+        if "MCTS" in targets and mcts_code:
+            mcts[mcts_code] = field_name
+        if "Kerala_eHealth_HIMS" in targets and hmis_code:
+            kerala[hmis_code] = field_name
+
+    return hmis, mcts, kerala
+
+
 def map_to_forms(validated: dict) -> dict:
     """
     Maps validated fields to all three destination schemas.
@@ -262,16 +286,19 @@ def map_to_forms(validated: dict) -> dict:
     visit_type = validated.get("visit_type")
 
     # If visit_type is unknown or not in registry, default to anc_visit
-    # since ANC is the most common ASHA visit by far
     if not visit_type or visit_type not in SCHEMA_REGISTRY:
         visit_type = "anc_visit"
 
     visit_schema = SCHEMA_REGISTRY[visit_type]
+    fields_array = visit_schema.get("fields", [])
 
-    # Map to each destination
-    hmis = map_to_schema(validated, visit_schema["hmis_fields"])
-    mcts = map_to_schema(validated, visit_schema["mcts_fields"])
-    kerala_hims = map_to_schema(validated, visit_schema["kerala_hims_fields"])
+    # Build the destination mappings from fields array
+    hmis_schema, mcts_schema, kerala_schema = build_destination_mappings(fields_array)
+
+    # Map to each destination using the built schemas
+    hmis = map_to_schema(validated, hmis_schema)
+    mcts = map_to_schema(validated, mcts_schema)
+    kerala_hims = map_to_schema(validated, kerala_schema)
 
     # Handle any unmapped fields by asking Groq where they should go
     hmis = handle_unmapped_fields(validated, hmis, "HMIS")

@@ -1,6 +1,6 @@
 import json
 # Import your logic from the other file
-from audit_chain import create_audit_entry 
+from app.audit_chain import create_audit_entry 
 
 # 1. Mock data from the AI Teammate's extraction
 mock_pipeline_output = [
