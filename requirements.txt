@@ -27,3 +27,4 @@ openai
 pytesseract
 Pillow
 groq
+cryptography

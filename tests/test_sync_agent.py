@@ -5,7 +5,6 @@ Tests sync_record, Redis clarification helpers, empty state handling,
 and full LangGraph pipeline integration.
 
 Run with:
-    cd nirvaah/nirvaah-backend
     python tests/test_sync_agent.py
 """
 

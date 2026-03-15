@@ -13,7 +13,7 @@ Nirvaah AI is an intelligent healthcare data processing pipeline designed to ass
 - **Automated Validation:** Cross-checks clinical data (like BP, Hemoglobin) against Kerala state protocol validation rules.
 - **Anomaly Detection:** Flags suspicious submission patterns using a locally-trained IsolationForest model.
 - **Dropout Risk Insights:** Predicts the risk of patients dropping out of care programs using an XGBoost classifier and checks eligibility for government schemes.
-- **Interactive Dashboard:** A React frontend (`nirvaah-dashboard`) provides real-time monitoring and analytics.
+- **Interactive Dashboard:** A React frontend (`dashboard/`) provides real-time monitoring and analytics.
 
 ## 🏗️ Architecture
 
@@ -41,14 +41,12 @@ Nirvah-AI/
 │   ├── webhook.py              # Twilio WhatsApp webhook endpoint
 │   ├── pipeline.py             # LangGraph state machine builder
 │   └── ...                    
+├── dashboard/                  # React + Vite frontend dashboard
+├── docs/                       # Agent and pipeline documentation
 ├── data/                       # Validation rules, prompt templates, and schema definitions
 ├── models/                     # Pre-trained ML models (Anomaly Detection, XGBoost)
 ├── scripts/                    # Scripts for training models and manual validation
-├── tests/                      # Pytest suite for the pipeline and agents
-└── nirvaah/                    # Project subdirectories
-    ├── docs/                   # Documentation tracking
-    ├── nirvaah-backend/        # Legacy backend directory (files moved to root for Render)
-    └── nirvaah-dashboard/      # React + Vite frontend dashboard
+└── tests/                      # Pytest suite for the pipeline and agents
 ```
 
 ## 🚀 Getting Started
@@ -98,7 +96,7 @@ ELEVENLABS_API_KEY=your_elevenlabs_api_key
 
 1. Navigate to the dashboard directory:
    ```bash
-   cd nirvaah/nirvaah-dashboard
+   cd dashboard
    ```
 2. Install Node modules:
    ```bash

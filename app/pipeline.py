@@ -15,22 +15,30 @@ from app.agents.extraction import extraction_node
 from app.agents.validation import validation_node
 from app.agents.form_agent import form_agent_node
 from app.agents.sync_agent import sync_node
+from app.agents.anomaly import anomaly_node
 from app.agents.insights import insights_node
 
 # ----------------------------------------------------------------
-# STUB NODES
+# CLARIFICATION NODE
+# Sends a WhatsApp clarification question to the ASHA worker
+# when the validation agent determines confidence is too low.
 # ----------------------------------------------------------------
 
 
 def clarification_node(state: PipelineState) -> dict:
-    print("[STUB] clarification_node — would send WhatsApp message here")
-    print(f"  Question: {state.get('clarification_question', '')}")
+    """Send a WhatsApp clarification question to the ASHA worker."""
+    from app.notifications import send_whatsapp
+    question = state.get('clarification_question', '')
+    sender_phone = state.get('sender_phone', '')
+    if question and sender_phone:
+        try:
+            send_whatsapp(sender_phone, question)
+            print(f"[CLARIFICATION] Sent question to {sender_phone}: {question}")
+        except Exception as e:
+            print(f"[CLARIFICATION] Failed to send WhatsApp: {e}")
+    else:
+        print(f"[CLARIFICATION] Missing question or phone — question='{question}', phone='{sender_phone}'")
     return {"pipeline_complete": False}
-
-
-def anomaly_node(state: PipelineState) -> dict:
-    print("[STUB] anomaly_node running — replace with Agent 5")
-    return {"anomaly_score": 0.0, "anomaly_flags": []}
 
 
 # ----------------------------------------------------------------

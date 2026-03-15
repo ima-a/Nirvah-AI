@@ -5,7 +5,6 @@ Tests range checks, confidence thresholds, clinical alerts, clarification
 flow, and full LangGraph pipeline integration.
 
 Run with:
-    cd nirvaah/nirvaah-backend
     python tests/test_validation.py
 """
 

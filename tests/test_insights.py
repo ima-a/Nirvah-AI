@@ -5,7 +5,6 @@ Tests dropout model training, risk scoring, scheme eligibility,
 risk summary generation, and full end-to-end pipeline.
 
 Run with:
-    cd nirvaah/nirvaah-backend
     python tests/test_insights.py
 """
 

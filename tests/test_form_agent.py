@@ -5,7 +5,6 @@ Tests schema mapping, derived field computation, metadata, unknown visit
 type fallback, and full LangGraph pipeline integration.
 
 Run with:
-    cd nirvaah/nirvaah-backend
     python tests/test_form_agent.py
 """
 

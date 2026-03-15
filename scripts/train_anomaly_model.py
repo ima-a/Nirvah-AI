@@ -5,7 +5,6 @@ Generates synthetic data (or loads real HMIS data from data/hmis_data.csv),
 trains a StandardScaler + IsolationForest, and saves model files to models/.
 
 Run with:
-    cd nirvaah/nirvaah-backend
     python scripts/train_anomaly_model.py
 """
 

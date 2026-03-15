@@ -20,6 +20,7 @@ import numpy as np
 from pathlib import Path
 from supabase import create_client, Client
 from app.state import PipelineState
+from app.security.anomaly_rules import check_incentive_trigger
 
 # ----------------------------------------------------------------
 # SUPABASE CLIENT (lazy initialization)
@@ -412,6 +413,27 @@ def anomaly_node(state: PipelineState) -> dict:
         score, flags = run_anomaly_detection(
             validated_fields, sender_phone, record_id
         )
+
+        # Check incentive trigger from cyber security module
+        visit_type = validated_fields.get('visit_type', '')
+        if visit_type:
+            try:
+                prev_count = get_supabase().table('records') \
+                    .select('id', count='exact') \
+                    .eq('beneficiary_id', validated_fields.get('beneficiary_id', '')) \
+                    .eq('visit_type', visit_type) \
+                    .execute()
+                visit_count = (prev_count.count or 0) + 1
+                incentive = check_incentive_trigger(visit_count, visit_type)
+                if incentive:
+                    flags.append(incentive['flag_type'])
+                    insert_alert(
+                        record_id, sender_phone,
+                        incentive['flag_type'], 0.0, 'low'
+                    )
+            except Exception as e:
+                print(f"[ANOMALY] Incentive check failed: {e}")
+
         return {
             "anomaly_score": score,
             "anomaly_flags": flags,

@@ -7,7 +7,6 @@ Generates synthetic data based on Kerala NFHS-5 published statistics
 Trains an XGBClassifier and saves model files to models/.
 
 Run with:
-    cd nirvaah/nirvaah-backend
     python scripts/train_dropout_model.py
 """
 
